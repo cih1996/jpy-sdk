@@ -1,0 +1,5 @@
+packages:
+  # SDK 包
+  - 'packages/*'
+  # 示例应用（直接在 apps 目录下）
+  - 'apps'

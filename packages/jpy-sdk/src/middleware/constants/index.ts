@@ -1,0 +1,121 @@
+/**
+ * 中间件业务功能代码 (f 字段)
+ */
+export enum BusinessFunction {
+    // 设备信息与状态
+    DEVICE_DETAIL = 4,
+    DEVICE_LIST = 5,
+    ONLINE_STATUS = 6,
+    SYSTEM_SYNC = 111,
+    SCREEN_ROTATION = 250, // 被动接收屏幕旋转
+
+    // 定位相关
+    GET_LOCATION = 149,
+    SIMULATE_LOCATION = 150,
+    STOP_SIMULATE_LOCATION = 151,
+
+    // 设备控制 (Mirror)
+    REBOOT_DEVICE = 155,
+    WIPE_DEVICE = 156,
+    SET_LANGUAGE_LOCALE = 157,
+    POWER_CONTROL_MIRROR = 217,
+    SWITCH_USB_MODE_MIRROR = 218,
+    CONTROL_ADB_MIRROR = 219,
+    SCREEN_OFF = 297,
+    SCREEN_ON = 298,
+    SWITCH_CAMERA = 515,
+    ROOT_GRANT = 516,
+    ROOT_REVOKE = 517,
+    SET_IME = 518,
+
+    // App 管理
+    GET_APP_LIST = 290,
+    START_APP = 291,
+    KILL_APP = 292,
+    UNINSTALL_APP = 159,
+    GET_FOREGROUND_APP = 320,
+
+    // 触摸与按键
+    TOUCH_ABSOLUTE = 257,
+    TOUCH_RELATIVE = 258, // 鼠标/触屏
+    SCROLL = 259, // 滚轮
+    PRESS_KEY = 281,
+    INPUT_TEXT = 769,
+    GET_CLIPBOARD = 770,
+
+    // Shell 执行
+    EXECUTE_SHELL = 289,
+
+    // 下载管理
+    ADD_DOWNLOAD_TASK = 293,
+    GET_CURRENT_DOWNLOAD_TASK = 294,
+    CANCEL_DOWNLOAD_TASK = 295,
+    GET_DOWNLOAD_LIST = 296,
+
+    // 文件操作
+    FILE_TRANSFER_START = 301,
+    FILE_TRANSFER_UPLOAD = 302,
+    FILE_TRANSFER_CANCEL = 303,
+    LIST_FILES = 304,
+    GET_FILE_INFO = 305,
+    MOVE_FILE = 306,
+    DELETE_FILE = 307,
+    COPY_TO_PHOTOS = 308,
+    FILE_DOWNLOAD_START = 309,
+    FILE_DOWNLOAD_CHUNK = 310,
+    UNZIP_FILE = 311,
+
+    // UI 与系统
+    GET_TOP_APP = 320,
+    FIND_NODE = 321,
+    FIND_DIALOG = 322,
+    OPEN_URL = 323,
+    TTS = 324,
+    TOAST = 325,
+    GET_APP_WEBVIEW_URL = 326,
+
+    // 外部请求与脚本
+    HTTP_REQUEST = 500,
+    EXECUTE_JS_SCRIPT = 510,
+    EXECUTE_JS_SCRIPT_FILE = 511,
+
+    // 截图与图像操作
+    SCREENSHOT = 299,
+    VIDEO_STREAM_START = 251,
+    VIDEO_STREAM_STOP = 252,
+    AUDIO_STREAM_START = 253,
+    AUDIO_STREAM_STOP = 254,
+    UPLOAD_IMAGE_CACHE = 398,
+    UPLOAD_IMAGE_ZIP_CACHE = 399,
+    CLEAN_IMAGE_CACHE = 400,
+    SCREENSHOT_TO_CACHE = 401,
+    RENEW_IMAGE_CACHE = 402,
+    RELEASE_IMAGE_CACHE = 403,
+    GET_IMAGE_FROM_CACHE = 404,
+    GET_CACHE_LIST = 405,
+    GET_COLOR = 406,
+    COMPARE_COLORS = 407,
+    FIND_COLOR = 408,
+    FIND_IMAGE_OLD = 409, // Keep existing just in case
+    FIND_IMAGE = 410,
+    OCR = 411,
+    SWITCH_USB_MODE = 106,
+    POWER_CONTROL = 107,
+    FORCE_FLASH_ROM = 108,
+    ENABLE_ADB = 109,
+    GET_ROM_PACKAGES = 113,
+    QUERY_FLASH_STATUS = 117,
+    FLASH_ROM_PROGRESS = 118,
+    FLASH_ROM = 119,
+    TERMINAL_INIT = 9,
+    DELETE_ROM_PACKAGE = 114,
+}
+
+
+export enum MessageType{
+    PONG = 2,
+    PING = 1,
+    VIDEO = 9,
+    MSGPACK = 5,
+    JSON = 7
+}
