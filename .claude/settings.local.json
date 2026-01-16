@@ -1,9 +1,0 @@
-{
-  "permissions": {
-    "allow": [
-      "mcp__web-search-prime__webSearchPrime",
-      "Bash(pnpm build:*)",
-      "Bash(pnpm build:all:*)"
-    ]
-  }
-}
