@@ -36,5 +36,7 @@ pnpm-debug.log*
 .cache/
 .parcel-cache/
 
+mcp_data/
+tests/
 
 temp/
