@@ -36,6 +36,10 @@ Used for `device list`, `device status`, and `device control` commands.
 | `--filter-online`| | Filter by device online status. | `--filter-online true` |
 | `--filter-adb` | | Filter by ADB enabled status. | `--filter-adb true` |
 | `--filter-usb` | | Filter by USB mode (true=Device/USB, false=Host/OTG). | `--filter-usb false` |
+| `--filter-uuid` | | Filter by UUID presence status (true/false). | `--filter-uuid true` |
+| `--filter-has-ip` | | Filter by IP presence status (true/false). | `--filter-has-ip false` |
+| `--uuid-count-gt` | | Filter servers with UUID count greater than specified value. | `--uuid-count-gt 10` |
+| `--uuid-count-lt` | | Filter servers with UUID count less than specified value. | `--uuid-count-lt 5` |
 
 ---
 
@@ -48,9 +52,40 @@ Manage and control connected devices.
 - **Intent**: Retrieve detailed list of devices matching criteria.
 - **Syntax**: `jpy-cli middleware device list [flags]`
 
+#### `export`
+- **Intent**: Export device information to a file with customizable fields.
+- **Syntax**: `jpy-cli middleware device export [output-file] [flags]`
+- **Key Flags**:
+        - `--export-id`: Export device ID (generated from server address).
+    - `--export-ip`: Export device IP address.
+    - `--export-uuid`: Export device UUID.
+    - `--export-seat`: Export device seat number.
+    - `--export-auto`: Intelligent export mode: automatically complete missing IP addresses for devices with UUID but no IP, skip devices without UUID, and log statistics.
+- **Default Behavior**: If no flags specified, exports all fields in format: `ID\tUUID\tIP\tSeat`
+- **Use Cases**:
+  - **DHCP Configuration**: When some devices fail to read IP but have SN (UUID), use `--export-auto` mode to intelligently infer and complete missing IP addresses, generating a complete device list for DHCP server configuration
+  - **Batch Device Management**: Export device information for automated script processing
+  - **Device Inventory**: Create complete device inventory with all necessary connection information
+
 #### `status`
 - **Intent**: Get aggregated server status and device counts.
 - **Syntax**: `jpy-cli middleware device status [flags]`
+- **Key Flags**:
+    - `--detail`: Show detailed authorization info (SN, Control Platform, License Name).
+    - **Advanced Filters**:
+        - `--auth-failed`: Filter servers with authorization issues.
+        - `--fw-has`: Filter servers where firmware version contains string.
+        - `--fw-not`: Filter servers where firmware version does not contain string.
+        - `--speed-gt`: Filter servers with network speed > value (Mbps).
+        - `--speed-lt`: Filter servers with network speed < value (Mbps).
+        - `--cluster-contains`: Filter servers where control platform address contains string.
+        - `--cluster-not-contains`: Filter servers where control platform address does not contain string.
+        - `--sn-gt`: Filter servers with SN > value (string compare).
+        - `--sn-lt`: Filter servers with SN < value (string compare).
+        - `--ip-count-gt`: Filter servers with IP count > value.
+        - `--ip-count-lt`: Filter servers with IP count < value.
+        - `--biz-online-gt`: Filter servers with Business Online count > value.
+        - `--biz-online-lt`: Filter servers with Business Online count < value.
 
 #### `reboot`
 - **Intent**: Power cycle the device.
@@ -126,6 +161,20 @@ Manage middleware server instances.
 - **Intent**: Batch import servers from JSON.
 - **Syntax**: `jpy-cli middleware auth import [file]`
 
+#### `ssh`
+- **Intent**: Connect to a middleware server via SSH (Automatically retrieves Root password).
+- **Syntax**: `jpy-cli middleware ssh [ip]`
+- **Prerequisites**: Requires Operation Login (automatically handled).
+- **Behavior**:
+    1. Connects to port 22 to retrieve the banner key.
+    2. Decrypts the root password using the Admin API.
+    3. Generates a connection command (supports `sshpass` if installed).
+
+#### `restart`
+- **Intent**: Restart the boxCore service on selected devices.
+- **Syntax**: `jpy-cli middleware restart [flags]`
+- **Note**: Supports concurrent execution and common filters (Group, Server, UUID, Seat, etc.).
+
 ---
 
 ### 3.3 Scope: Admin (`admin`)
@@ -134,6 +183,15 @@ System administration and license management.
 #### `middleware admin auto-auth`
 - **Intent**: Auto-scan and authorize pending middleware servers.
 - **Syntax**: `jpy-cli middleware admin auto-auth`
+
+#### `middleware admin update-cluster`
+- **Intent**: Batch update the Control Platform address (MgtCenter) for middleware servers and sync with Admin Backend.
+- **Syntax**: `jpy-cli middleware admin update-cluster [new_address] [flags]`
+- **Key Flags**:
+    - `--server`: Filter server URL/Name (regex supported).
+    - `--group`: Target specific server group.
+    - `--authorized`: Filter by authorization status (true/false).
+    - `--force`: Force update even if the address already matches.
 
 #### `admin device generate`
 - **Intent**: Generate new license codes.
@@ -197,6 +255,22 @@ This section maps **User Intent** to **Precise Command Execution**. AI agents sh
 - **Command**:
   ```bash
   jpy-cli middleware device log -s "192.168.1.100" --seat 5
+  ```
+
+**Scenario 5: Filter Devices by UUID Status**
+- **User Intent**: "List only devices that have UUIDs."
+- **Reasoning**: Use `--filter-uuid true` to filter devices with UUIDs.
+- **Command**:
+  ```bash
+  jpy-cli middleware device list --filter-uuid true
+  ```
+
+**Scenario 6: Filter Servers by UUID Count**
+- **User Intent**: "Show servers with more than 10 UUIDs."
+- **Reasoning**: Use `--uuid-count-gt 10` to filter servers by UUID count.
+- **Command**:
+  ```bash
+  jpy-cli middleware device status --uuid-count-gt 10
   ```
 
 ### 4.2 Server Maintenance Scenarios
@@ -303,13 +377,40 @@ For developers extending this tool:
    .\jpy.exe middleware relogin
    ```
 
+### Export Device Information for Analysis
+1. **Export all online devices with ID and UUID:**
+   ```bash
+   .\jpy.exe middleware device export devices.txt --export-id --export-uuid --filter-online true
+   ```
+
+2. **Export complete device information for specific server range:**
+   ```bash
+   .\jpy.exe middleware device export server_devices.txt -s "192.168.1"
+   ```
+
 ### Investigate Logs for Devices Failed to Online (No IP)
 1. **List Only Devices Without IP:**
    ```bash
    .\jpy.exe middleware device list --filter-has-ip false
    ```
 
-2. **Retrieve Log for a Sample Device:** Pick one device from the list to inspect internal logs.
+2.3. Retrieve Log for a Sample Device: Pick one device from the list to inspect internal logs.
    ```bash
    .\jpy.exe middleware device log --server 192.168.10.206 --seat 12
+   ```
+
+### Add/Switch Middleware Server Groups
+1. View current active/selected group
+   ```bash
+   .\jpy.exe middleware auth select
+   ```
+
+2. Select/Switch to specific group
+   ```bash
+   .\jpy.exe middleware auth select [group]
+   ```
+
+3. Add server to current active group
+   ```bash
+   .\jpy.exe middleware auth login "192.168.0.102" -u admin -p admin
    ```

@@ -300,3 +300,72 @@ func (c *Client) GetRecentAuthRecords(limit int) ([]model.AuthCodeItem, error) {
 
 	return allRecords, nil
 }
+
+func (c *Client) GetAuthBySN(sn string) (*model.AuthCodeItem, error) {
+	url := fmt.Sprintf("%s/partner/auth?did=0&queryField=serial_number&query=%s&sortOrder=id%%20asc&pageNum=1&pageSize=30", c.BaseURL, sn)
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Set("Authorization", c.Token)
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := c.HTTP.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("HTTP %d", resp.StatusCode)
+	}
+
+	var result model.AuthSearchResult
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return nil, err
+	}
+
+	if result.Status != 200 {
+		return nil, fmt.Errorf(result.Msg)
+	}
+
+	for _, item := range result.Data.DataList {
+		if item.SerialNumber == sn {
+			return &item, nil
+		}
+	}
+
+	return nil, fmt.Errorf("not found")
+}
+
+func (c *Client) UpdateAuth(payload model.AuthCodePayload) error {
+	body, _ := json.Marshal(payload)
+	req, err := http.NewRequest("PUT", c.BaseURL+"/partner/auth", bytes.NewBuffer(body))
+	if err != nil {
+		return err
+	}
+
+	req.Header.Set("Authorization", c.Token)
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := c.HTTP.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	var result struct {
+		Status int    `json:"status"`
+		Msg    string `json:"msg"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return err
+	}
+
+	if result.Status != 200 {
+		return fmt.Errorf(result.Msg)
+	}
+
+	return nil
+}

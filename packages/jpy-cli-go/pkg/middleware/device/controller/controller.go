@@ -8,6 +8,8 @@ import (
 	"jpy-cli/pkg/middleware/device/api"
 	"jpy-cli/pkg/middleware/device/terminal"
 	"jpy-cli/pkg/middleware/model"
+	"sync"
+	"sync/atomic"
 )
 
 // DeviceController handles device control operations.
@@ -64,7 +66,7 @@ func (c *DeviceController) ExecuteBatch(devices []model.DeviceInfo, action func(
 			continue
 		}
 
-		deviceAPI := api.NewDeviceAPI(ws)
+		deviceAPI := api.NewDeviceAPI(ws, server.URL, server.Token)
 
 		for _, d := range serverDevices {
 			processedCount++
@@ -228,6 +230,78 @@ func (c *DeviceController) executeTerminalBatch(devices []model.DeviceInfo, acti
 		}
 	}
 
+	fmt.Printf("\n批量操作完成。成功: %d, 失败: %d\n", successCount, failCount)
+
+	if failCount > 0 {
+		return fmt.Errorf("部分操作失败")
+	}
+	return nil
+}
+
+// RestartServiceBatch executes the restart service command on multiple devices concurrently.
+func (c *DeviceController) RestartServiceBatch(devices []model.DeviceInfo, service string, actionCode int) error {
+	// Deduplicate servers
+	uniqueServers := make(map[string]struct{})
+	var targetServers []string
+	for _, d := range devices {
+		if _, exists := uniqueServers[d.ServerURL]; !exists {
+			uniqueServers[d.ServerURL] = struct{}{}
+			targetServers = append(targetServers, d.ServerURL)
+		}
+	}
+
+	totalServers := len(targetServers)
+	concurrency := config.GlobalSettings.MaxConcurrency
+	if concurrency <= 0 {
+		concurrency = 5
+	}
+	fmt.Printf("开始对 %d 个中间件服务进行批量重启 (涉及 %d 台设备, 并发数: %d)...\n", totalServers, len(devices), concurrency)
+
+	var wg sync.WaitGroup
+	semaphore := make(chan struct{}, concurrency)
+
+	successCount := int32(0)
+	failCount := int32(0)
+	processedCount := int32(0)
+
+	for _, serverURL := range targetServers {
+		wg.Add(1)
+		go func(url string) {
+			defer wg.Done()
+
+			semaphore <- struct{}{}        // Acquire
+			defer func() { <-semaphore }() // Release
+
+			// Process
+			err := func() error {
+				server, found := c.findServerConfig(url)
+				if !found {
+					return fmt.Errorf("缺少服务器配置: %s", url)
+				}
+
+				// HTTP only, no WS
+				deviceAPI := api.NewDeviceAPI(nil, server.URL, server.Token)
+				return deviceAPI.RestartService(service, actionCode)
+			}()
+
+			currentProcessed := atomic.AddInt32(&processedCount, 1)
+
+			// Simple console output
+			if err != nil {
+				atomic.AddInt32(&failCount, 1)
+				logger.Errorf("重启服务失败 %s: %v", url, err)
+			} else {
+				atomic.AddInt32(&successCount, 1)
+				logger.Infof("成功重启服务 %s", url)
+			}
+
+			// Print progress (approximate, might interleave but \r helps)
+			fmt.Printf("\r正在处理... %d/%d (成功: %d, 失败: %d)", currentProcessed, totalServers, atomic.LoadInt32(&successCount), atomic.LoadInt32(&failCount))
+
+		}(serverURL)
+	}
+
+	wg.Wait()
 	fmt.Printf("\n批量操作完成。成功: %d, 失败: %d\n", successCount, failCount)
 
 	if failCount > 0 {

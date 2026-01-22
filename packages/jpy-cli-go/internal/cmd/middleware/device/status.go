@@ -21,22 +21,46 @@ import (
 )
 
 type ServerStatusStats struct {
-	ServerURL      string
-	Status         string
-	LicenseStatus  string
-	DeviceCount    int
-	BizOnlineCount int
-	IPCount        int
-	UUIDCount      int
-	ADBCount       int
-	USBCount       int
-	OTGCount       int
-	Error          error
-	OrderIndex     int
+	ServerURL       string
+	Status          string
+	LicenseStatus   string
+	SN              string
+	ControlAddr     string
+	LicenseName     string
+	FirmwareVersion string
+	NetworkSpeed    string
+	NetworkSpeedVal float64 // For filtering
+	DeviceCount     int
+	BizOnlineCount  int
+	IPCount         int
+	UUIDCount       int
+	ADBCount        int
+	USBCount        int
+	OTGCount        int
+	Error           error
+	OrderIndex      int
 }
 
 func NewStatusCmd() *cobra.Command {
 	opts := CommonFlags{}
+	var detail bool
+	var (
+		bizOnlineGT        int
+		bizOnlineLT        int
+		ipCountGT          int
+		ipCountLT          int
+		uuidCountGT        int
+		uuidCountLT        int
+		snGT               string
+		snLT               string
+		authFailed         bool
+		clusterContains    string
+		clusterNotContains string
+		fwVersionHas       string
+		fwVersionNot       string
+		netSpeedGT         float64
+		netSpeedLT         float64
+	)
 
 	cmd := &cobra.Command{
 		Use:   "status",
@@ -49,6 +73,12 @@ func NewStatusCmd() *cobra.Command {
 - 筛选特定UUID或机位的设备
 - 筛选ADB开启/关闭的设备
 - 筛选已授权/未授权服务器
+
+新增高级筛选：
+- 业务在线数/IP数 (> 或 <)
+- 序列号范围 (> 或 <)
+- 授权状态非成功
+- 集控平台地址包含/不包含
 
 筛选条件可以组合使用（AND逻辑）。`,
 		Run: func(cmd *cobra.Command, args []string) {
@@ -101,6 +131,9 @@ func NewStatusCmd() *cobra.Command {
 				concurrency = 5
 			}
 
+			// Determine if we need to fetch details
+			fetchDetails := detail || fwVersionHas != "" || fwVersionNot != "" || netSpeedGT > -1 || netSpeedLT > -1
+
 			// Results channel for TUI
 			resultsChan := make(chan interface{}, len(targets))
 			var wg sync.WaitGroup
@@ -125,10 +158,34 @@ func NewStatusCmd() *cobra.Command {
 					apiClient := httpclient.NewClient(server.URL, server.Token)
 					lic, err := apiClient.GetLicense()
 					if err == nil {
-						if lic.StatusTxt != nil {
-							stats.LicenseStatus = *lic.StatusTxt
+						// Re-authorize if Status is success but Control Platform (C) is missing
+						if lic.StatusTxt == "成功" && lic.C == "" {
+							logger.Warnf("[%s] Authorization successful but Control Platform missing. Re-submitting authorization code...", server.URL)
+							if reauthErr := apiClient.Reauthorize(lic.Sn); reauthErr == nil {
+								logger.Infof("[%s] Re-authorization submitted successfully. Refreshing license info...", server.URL)
+								if newLic, refreshErr := apiClient.GetLicense(); refreshErr == nil {
+									lic = newLic
+								} else {
+									logger.Warnf("[%s] Failed to refresh license after re-authorization: %v", server.URL, refreshErr)
+								}
+							} else {
+								logger.Errorf("[%s] Re-authorization failed: %v", server.URL, reauthErr)
+							}
+						}
+
+						if lic.StatusTxt != "" {
+							stats.LicenseStatus = lic.StatusTxt
 						} else {
 							stats.LicenseStatus = "Unknown"
+						}
+						if lic.Sn != "" {
+							stats.SN = lic.Sn
+						}
+						if lic.C != "" {
+							stats.ControlAddr = lic.C
+						}
+						if lic.N != "" {
+							stats.LicenseName = lic.N
 						}
 						stats.Status = "Online"
 					} else {
@@ -146,10 +203,34 @@ func NewStatusCmd() *cobra.Command {
 							apiClient.Token = newToken
 							lic, err = apiClient.GetLicense()
 							if err == nil {
-								if lic.StatusTxt != nil {
-									stats.LicenseStatus = *lic.StatusTxt
+								// Re-authorize if Status is success but Control Platform (C) is missing
+								if lic.StatusTxt == "成功" && lic.C == "" {
+									logger.Warnf("[%s] Authorization successful but Control Platform missing. Re-submitting authorization code...", server.URL)
+									if reauthErr := apiClient.Reauthorize(lic.Sn); reauthErr == nil {
+										logger.Infof("[%s] Re-authorization submitted successfully. Refreshing license info...", server.URL)
+										if newLic, refreshErr := apiClient.GetLicense(); refreshErr == nil {
+											lic = newLic
+										} else {
+											logger.Warnf("[%s] Failed to refresh license after re-authorization: %v", server.URL, refreshErr)
+										}
+									} else {
+										logger.Errorf("[%s] Re-authorization failed: %v", server.URL, reauthErr)
+									}
+								}
+
+								if lic.StatusTxt != "" {
+									stats.LicenseStatus = lic.StatusTxt
 								} else {
 									stats.LicenseStatus = "Unknown"
+								}
+								if lic.Sn != "" {
+									stats.SN = lic.Sn
+								}
+								if lic.C != "" {
+									stats.ControlAddr = lic.C
+								}
+								if lic.N != "" {
+									stats.LicenseName = lic.N
 								}
 								stats.Status = "Online"
 								logger.Infof("[%s] Re-login successful", server.URL)
@@ -170,7 +251,26 @@ func NewStatusCmd() *cobra.Command {
 						wsClient := wsclient.NewClient(server.URL, server.Token)
 						wsClient.Timeout = time.Duration(config.GlobalSettings.ConnectTimeout) * time.Second
 						if err := wsClient.Connect(); err == nil {
-							deviceAPI := api.NewDeviceAPI(wsClient)
+							deviceAPI := api.NewDeviceAPI(wsClient, server.URL, server.Token)
+
+							// Fetch server information
+							if fetchDetails {
+								if version, err := deviceAPI.GetSystemVersion(); err == nil {
+									stats.FirmwareVersion = version.Version
+								} else {
+									logger.Warnf("[%s] Failed to get system version: %v", server.URL, err)
+								}
+
+								if networkInfo, err := deviceAPI.GetNetworkInfo(); err == nil && networkInfo.Speed != nil && networkInfo.Speed.Double != nil {
+									speed := *networkInfo.Speed.Double
+									stats.NetworkSpeedVal = speed
+									if speed > 0 {
+										stats.NetworkSpeed = fmt.Sprintf("%.1f Mbps", speed)
+									}
+								} else {
+									logger.Warnf("[%s] Failed to get network info: %v", server.URL, err)
+								}
+							}
 
 							// Fetch list and status
 							devices, err := deviceAPI.FetchDeviceList()
@@ -331,6 +431,67 @@ func NewStatusCmd() *cobra.Command {
 					keep = false
 				}
 
+				// Auth Failed Filter
+				if authFailed && r.LicenseStatus == "成功" {
+					keep = false
+				}
+
+				// Biz Online Count
+				if bizOnlineGT > -1 && r.BizOnlineCount <= bizOnlineGT {
+					keep = false
+				}
+				if bizOnlineLT > -1 && r.BizOnlineCount >= bizOnlineLT {
+					keep = false
+				}
+
+				// IP Count
+				if ipCountGT > -1 && r.IPCount <= ipCountGT {
+					keep = false
+				}
+				if ipCountLT > -1 && r.IPCount >= ipCountLT {
+					keep = false
+				}
+
+				// UUID Count
+				if uuidCountGT > -1 && r.UUIDCount <= uuidCountGT {
+					keep = false
+				}
+				if uuidCountLT > -1 && r.UUIDCount >= uuidCountLT {
+					keep = false
+				}
+
+				// SN Comparison (Lexicographical)
+				if snGT != "" && r.SN <= snGT {
+					keep = false
+				}
+				if snLT != "" && r.SN >= snLT {
+					keep = false
+				}
+
+				// Cluster Address Filter
+				if clusterContains != "" && !strings.Contains(r.ControlAddr, clusterContains) {
+					keep = false
+				}
+				if clusterNotContains != "" && strings.Contains(r.ControlAddr, clusterNotContains) {
+					keep = false
+				}
+
+				// Firmware Version Filter
+				if fwVersionHas != "" && !strings.Contains(r.FirmwareVersion, fwVersionHas) {
+					keep = false
+				}
+				if fwVersionNot != "" && strings.Contains(r.FirmwareVersion, fwVersionNot) {
+					keep = false
+				}
+
+				// Network Speed Filter
+				if netSpeedGT > -1 && r.NetworkSpeedVal <= netSpeedGT {
+					keep = false
+				}
+				if netSpeedLT > -1 && r.NetworkSpeedVal >= netSpeedLT {
+					keep = false
+				}
+
 				// If any device filter was active, we probably want to hide servers with 0 results
 				// Device filters: UUID, Seat, Online, ADB, USB, HasIP
 				hasDeviceFilter := opts.UUID != "" || opts.Seat > -1 || opts.FilterOnline != "" ||
@@ -372,9 +533,28 @@ func NewStatusCmd() *cobra.Command {
 				numBadStyle     = lipgloss.NewStyle().Foreground(lipgloss.Color("196"))
 				numNeutralStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("240")) // Grey
 
-				headers = []string{"服务器地址", "状态", "设备数", "业务在线", "IP", "序列号", "ADB", "模式(OTG/USB)", "授权"}
-				widths  = []int{24, 10, 8, 12, 12, 14, 14, 14, 10}
+				headers []string
+				widths  []int
 			)
+
+			headers = []string{"服务器地址", "状态"}
+			widths = []int{24, 10}
+
+			if detail {
+				headers = append(headers, "固件版本", "网络速率")
+				widths = append(widths, 12, 12)
+			}
+
+			headers = append(headers, "设备数", "业务在线", "IP", "序列号", "ADB", "模式(OTG/USB)")
+			widths = append(widths, 8, 12, 12, 14, 14, 14)
+
+			if detail {
+				headers = append(headers, "授权(状态/SN/集控/名称)")
+				widths = append(widths, 90)
+			} else {
+				headers = append(headers, "授权")
+				widths = append(widths, 30)
+			}
 
 			// Helper to render stats "Good/Bad"
 			renderStats := func(good, bad int, isMode bool) string {
@@ -405,13 +585,15 @@ func NewStatusCmd() *cobra.Command {
 			fmt.Println(lipgloss.NewStyle().Foreground(lipgloss.Color("240")).Render(strings.Repeat("-", lipgloss.Width(headerRow))))
 
 			var (
-				totalDevice    int
-				totalBizOnline int
-				totalIP        int
-				totalUUID      int
-				totalADB       int
-				totalUSB       int
-				totalOTG       int
+				totalDevice      int
+				totalBizOnline   int
+				totalIP          int
+				totalUUID        int
+				totalADB         int
+				totalUSB         int
+				totalOTG         int
+				totalNormalSpeed int
+				totalLowSpeed    int
 			)
 
 			for _, r := range results {
@@ -434,22 +616,62 @@ func NewStatusCmd() *cobra.Command {
 					stStatus = statusErrorStyle
 				}
 
+				// Network Speed Style & Stats
+				stSpeed := cellStyle
+				if r.NetworkSpeed != "" {
+					if r.NetworkSpeedVal < 1000 {
+						stSpeed = statusErrorStyle // Red
+						totalLowSpeed++
+					} else {
+						totalNormalSpeed++
+					}
+				}
+
 				stLic := statusOnlineStyle
 				if r.LicenseStatus != "成功" {
 					stLic = statusErrorStyle
 				}
 
+				// Construct detailed license info string
+				authInfo := r.LicenseStatus
+				if detail {
+					var details []string
+					if r.SN != "" {
+						details = append(details, fmt.Sprintf("SN:%s", r.SN))
+					}
+					if r.ControlAddr != "" {
+						details = append(details, fmt.Sprintf("C:%s", r.ControlAddr))
+					}
+					if r.LicenseName != "" {
+						details = append(details, fmt.Sprintf("N:%s", r.LicenseName))
+					}
+					if len(details) > 0 {
+						authInfo = fmt.Sprintf("%s | %s", r.LicenseStatus, strings.Join(details, " | "))
+					}
+				}
+
 				row := []string{
 					cellStyle.Width(widths[0]).Render(displayURL),
 					stStatus.Width(widths[1]).Render(r.Status),
-					cellStyle.Width(widths[2]).Render(fmt.Sprintf("%d", r.DeviceCount)),
-					cellStyle.Width(widths[3]).Render(renderStats(r.BizOnlineCount, r.DeviceCount-r.BizOnlineCount, false)),
-					cellStyle.Width(widths[4]).Render(renderStats(r.IPCount, r.DeviceCount-r.IPCount, false)),
-					cellStyle.Width(widths[5]).Render(renderStats(r.UUIDCount, r.DeviceCount-r.UUIDCount, false)),
-					cellStyle.Width(widths[6]).Render(renderStats(r.ADBCount, r.DeviceCount-r.ADBCount, false)),
-					cellStyle.Width(widths[7]).Render(renderStats(r.OTGCount, r.USBCount, true)),
-					stLic.Width(widths[8]).Render(r.LicenseStatus),
 				}
+
+				idx := 2
+				if detail {
+					row = append(row, cellStyle.Width(widths[idx]).Render(r.FirmwareVersion))
+					idx++
+					row = append(row, stSpeed.Width(widths[idx]).Render(r.NetworkSpeed))
+					idx++
+				}
+
+				row = append(row,
+					cellStyle.Width(widths[idx]).Render(fmt.Sprintf("%d", r.DeviceCount)),
+					cellStyle.Width(widths[idx+1]).Render(renderStats(r.BizOnlineCount, r.DeviceCount-r.BizOnlineCount, false)),
+					cellStyle.Width(widths[idx+2]).Render(renderStats(r.IPCount, r.DeviceCount-r.IPCount, false)),
+					cellStyle.Width(widths[idx+3]).Render(renderStats(r.UUIDCount, r.DeviceCount-r.UUIDCount, false)),
+					cellStyle.Width(widths[idx+4]).Render(renderStats(r.ADBCount, r.DeviceCount-r.ADBCount, false)),
+					cellStyle.Width(widths[idx+5]).Render(renderStats(r.OTGCount, r.USBCount, true)),
+					stLic.Width(widths[idx+6]).Render(authInfo),
+				)
 
 				var rowStr string
 				for _, cell := range row {
@@ -461,16 +683,27 @@ func NewStatusCmd() *cobra.Command {
 			fmt.Println(lipgloss.NewStyle().Foreground(lipgloss.Color("240")).Render(strings.Repeat("-", lipgloss.Width(headerRow))))
 
 			totalRow := []string{
-				cellStyle.Width(widths[0]).Render("总计"),
+				cellStyle.Width(widths[0]).Render(fmt.Sprintf("总计 (%d 台服务器)", len(results))),
 				cellStyle.Width(widths[1]).Render("-"),
-				cellStyle.Width(widths[2]).Render(fmt.Sprintf("%d", totalDevice)),
-				cellStyle.Width(widths[3]).Render(renderStats(totalBizOnline, totalDevice-totalBizOnline, false)),
-				cellStyle.Width(widths[4]).Render(renderStats(totalIP, totalDevice-totalIP, false)),
-				cellStyle.Width(widths[5]).Render(renderStats(totalUUID, totalDevice-totalUUID, false)),
-				cellStyle.Width(widths[6]).Render(renderStats(totalADB, totalDevice-totalADB, false)),
-				cellStyle.Width(widths[7]).Render(renderStats(totalOTG, totalUSB, true)),
-				cellStyle.Width(widths[8]).Render("-"),
 			}
+
+			idx := 2
+			if detail {
+				totalRow = append(totalRow, cellStyle.Width(widths[idx]).Render("-"))
+				idx++
+				totalRow = append(totalRow, cellStyle.Width(widths[idx]).Render(renderStats(totalNormalSpeed, totalLowSpeed, false)))
+				idx++
+			}
+
+			totalRow = append(totalRow,
+				cellStyle.Width(widths[idx]).Render(fmt.Sprintf("%d", totalDevice)),
+				cellStyle.Width(widths[idx+1]).Render(renderStats(totalBizOnline, totalDevice-totalBizOnline, false)),
+				cellStyle.Width(widths[idx+2]).Render(renderStats(totalIP, totalDevice-totalIP, false)),
+				cellStyle.Width(widths[idx+3]).Render(renderStats(totalUUID, totalDevice-totalUUID, false)),
+				cellStyle.Width(widths[idx+4]).Render(renderStats(totalADB, totalDevice-totalADB, false)),
+				cellStyle.Width(widths[idx+5]).Render(renderStats(totalOTG, totalUSB, true)),
+				cellStyle.Width(widths[idx+6]).Render("-"),
+			)
 			var totalStr string
 			for _, cell := range totalRow {
 				totalStr = lipgloss.JoinHorizontal(lipgloss.Top, totalStr, cell)
@@ -480,6 +713,24 @@ func NewStatusCmd() *cobra.Command {
 	}
 
 	AddCommonFlags(cmd, &opts)
+	cmd.Flags().BoolVar(&detail, "detail", false, "显示详细授权信息 (SN, 集控地址, 授权名称)")
+
+	// New Filter Flags
+	cmd.Flags().IntVar(&bizOnlineGT, "biz-online-gt", -1, "筛选业务在线数大于指定值的服务器")
+	cmd.Flags().IntVar(&bizOnlineLT, "biz-online-lt", -1, "筛选业务在线数小于指定值的服务器")
+	cmd.Flags().IntVar(&ipCountGT, "ip-count-gt", -1, "筛选IP数大于指定值的服务器")
+	cmd.Flags().IntVar(&ipCountLT, "ip-count-lt", -1, "筛选IP数小于指定值的服务器")
+	cmd.Flags().IntVar(&uuidCountGT, "uuid-count-gt", -1, "筛选UUID数大于指定值的服务器")
+	cmd.Flags().IntVar(&uuidCountLT, "uuid-count-lt", -1, "筛选UUID数小于指定值的服务器")
+	cmd.Flags().StringVar(&snGT, "sn-gt", "", "筛选序列号大于指定值的服务器")
+	cmd.Flags().StringVar(&snLT, "sn-lt", "", "筛选序列号小于指定值的服务器")
+	cmd.Flags().BoolVar(&authFailed, "auth-failed", false, "筛选授权状态非成功的服务器")
+	cmd.Flags().StringVar(&clusterContains, "cluster-contains", "", "筛选集控平台地址包含指定字符串的服务器")
+	cmd.Flags().StringVar(&clusterNotContains, "cluster-not-contains", "", "筛选集控平台地址不包含指定字符串的服务器")
+	cmd.Flags().StringVar(&fwVersionHas, "fw-has", "", "筛选固件版本包含指定字符串的服务器")
+	cmd.Flags().StringVar(&fwVersionNot, "fw-not", "", "筛选固件版本不包含指定字符串的服务器")
+	cmd.Flags().Float64Var(&netSpeedGT, "speed-gt", -1, "筛选网络速率大于指定值(Mbps)的服务器")
+	cmd.Flags().Float64Var(&netSpeedLT, "speed-lt", -1, "筛选网络速率小于指定值(Mbps)的服务器")
 
 	return cmd
 }

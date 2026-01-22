@@ -125,24 +125,18 @@ func scanServers(cfg *config.Config) []model.ServerStatus {
 			}
 
 			// Debug logging for license status
-			statusVal := "nil"
-			if info.Status != nil {
-				statusVal = fmt.Sprintf("%d", *info.Status)
-			}
+			statusVal := fmt.Sprintf("%d", info.Status)
 
 			// Check authorization status using logic from status.go (StatusTxt == "成功")
 			isAuthorized := false
-			var statusTxt string
-			if info.StatusTxt != nil {
-				statusTxt = *info.StatusTxt
-			}
+			statusTxt := info.StatusTxt
 
 			if statusTxt == "成功" {
 				isAuthorized = true
 			}
 
 			if !isAuthorized {
-				logger.Infof("Server %s license status: Valid=%v, Status=%s, StatusTxt=%s (Unauthorized)", server.URL, info.Valid, statusVal, statusTxt)
+				logger.Infof("Server %s license status: Valid=%v, Status=%s, StatusTxt=%s (Unauthorized)", server.URL, info.S, statusVal, statusTxt)
 				mu.Lock()
 				unauthorizedConfigs = append(unauthorizedConfigs, server)
 				mu.Unlock()

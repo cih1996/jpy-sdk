@@ -49,6 +49,11 @@ type AuthCodeItem struct {
 	Limit        int    `json:"limit"`
 	Used         int    `json:"used"`
 	Day          int    `json:"day"`
+	Supervise    bool   `json:"supervise"`
+	Type         int    `json:"type"`
+	Desc         string `json:"desc"`
+	MgtCenter    string `json:"mgtCenter"`
+	Online       bool   `json:"online"`
 }
 
 type AuthSearchResult struct {

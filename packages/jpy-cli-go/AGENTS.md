@@ -12,17 +12,21 @@ packages/jpy-cli-go/
 ├── internal/
 │   └── cmd/                  # Cobra 命令定义 (Command Definitions)
 │       ├── admin/            # 管理员相关命令 (generate, list, root_pwd)
+│       │   └── middleware/   # 管理员中间件操作 (update-cluster)
 │       ├── config/           # 配置管理命令
 │       ├── log/              # 日志管理命令
 │       ├── middleware/       # 中间件业务命令
-│       │   ├── admin/        # 管理员子命令 (auto-auth)
+│       │   ├── admin/        # 管理员子命令 (auto-auth, update-cluster)
 │       │   ├── auth/         # 认证相关 (login, import, list)
 │       │   ├── device/       # 设备管理 (list, control, log, status)
-│       │   ├── tools/        # 工具命令 (create)
 │       │   ├── middleware.go # 中间件命令入口
 │       │   ├── relogin.go    # 重连命令
 │       │   ├── remove.go     # 删除命令
+│       │   ├── server_list.go# 服务器列表命令
 │       │   └── ssh.go        # SSH 命令
+│       ├── tools/            # 工具箱命令
+│       │   ├── middleware/   # 中间件工具 (create)
+│       │   └── tools.go      # 工具箱入口
 │       └── root.go           # 根命令定义
 ├── pkg/
 │   ├── admin-middleware/     # 管理后台中间件逻辑

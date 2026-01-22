@@ -65,11 +65,11 @@ func (c *Client) Login(username, password string) (string, error) {
 
 type LicenseResponse struct {
 	Code int               `json:"code"`
-	Data model.LicenseInfo `json:"data"`
+	Data model.LicenseData `json:"data"`
 	Msg  string            `json:"msg"`
 }
 
-func (c *Client) GetLicense() (*model.LicenseInfo, error) {
+func (c *Client) GetLicense() (*model.LicenseData, error) {
 	req, _ := http.NewRequest("GET", c.BaseURL+"/box/license", nil)
 	req.Header.Set("Authorization", c.Token)
 

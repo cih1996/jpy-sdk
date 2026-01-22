@@ -21,6 +21,7 @@ func NewMiddlewareCmd() *cobra.Command {
 	cmd.AddCommand(NewRemoveCmd())
 	cmd.AddCommand(NewReloginCmd())
 	cmd.AddCommand(NewListCmd())
+	cmd.AddCommand(NewRestartCmd())
 
 	return cmd
 }

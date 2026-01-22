@@ -43,7 +43,7 @@ func FetchDevices(servers []config.LocalServerConfig, cfg *config.Config) (chan 
 		if s.Disabled {
 			continue
 		}
-		
+
 		wg.Add(1)
 		go func(server config.LocalServerConfig) {
 			defer wg.Done()
@@ -64,7 +64,7 @@ func FetchDevices(servers []config.LocalServerConfig, cfg *config.Config) (chan 
 			}
 			defer ws.Close()
 
-			deviceAPI := api.NewDeviceAPI(ws)
+			deviceAPI := api.NewDeviceAPI(ws, server.URL, server.Token)
 			devices, err := deviceAPI.FetchDeviceList()
 			if err != nil {
 				res.Error = fmt.Errorf("获取设备列表失败: %v", err)
@@ -128,8 +128,10 @@ func ProcessResults(rawResults []interface{}) ([]model.DeviceInfo, int) {
 
 			if s, ok := statusMap[d.Seat]; ok {
 				s.Parse()
-				if s.IsBusinessOnline || s.IsControlBoardOnline || s.IsManagementOnline {
+				if s.IsBusinessOnline && s.IsManagementOnline {
 					info.IsOnline = true
+				}
+				if s.IP != "" {
 					info.IP = s.IP
 				}
 				if s.IsManagementOnline {

@@ -18,6 +18,7 @@ type CommonFlags struct {
 	FilterUSB    string // "true"/"false"
 	FilterOnline string // "true"/"false"
 	FilterHasIP  string // "true"/"false"
+	FilterUUID   string // "true"/"false"
 
 	AuthorizedOnly bool // 仅筛选已授权服务器
 
@@ -36,6 +37,7 @@ func AddCommonFlags(cmd *cobra.Command, opts *CommonFlags) {
 	cmd.Flags().StringVar(&opts.FilterUSB, "filter-usb", "", "筛选USB模式 (true=USB, false=OTG)")
 	cmd.Flags().StringVar(&opts.FilterOnline, "filter-online", "", "筛选在线状态 (true/false)")
 	cmd.Flags().StringVar(&opts.FilterHasIP, "filter-has-ip", "", "筛选IP存在状态 (true/false)")
+	cmd.Flags().StringVar(&opts.FilterUUID, "filter-uuid", "", "筛选UUID存在状态 (true/false)")
 
 	cmd.Flags().BoolVar(&opts.AuthorizedOnly, "authorized", false, "仅筛选已授权服务器")
 	cmd.Flags().BoolVarP(&opts.Interactive, "interactive", "i", false, "交互式选择模式")
@@ -68,6 +70,10 @@ func (opts *CommonFlags) ToSelectorOptions() (selector.SelectionOptions, error) 
 	if opts.FilterHasIP != "" {
 		val := opts.FilterHasIP == "true"
 		res.HasIP = &val
+	}
+	if opts.FilterUUID != "" {
+		val := opts.FilterUUID == "true"
+		res.HasUUID = &val
 	}
 	return res, nil
 }

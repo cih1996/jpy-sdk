@@ -13,5 +13,6 @@ func NewToolsCmd() *cobra.Command {
 	}
 
 	cmd.AddCommand(middleware.NewMiddlewareCmd())
+	cmd.AddCommand(NewCompletionInstallCmd())
 	return cmd
 }

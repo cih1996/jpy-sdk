@@ -87,10 +87,11 @@
 
 package model
 
-import "bytes"
-import "errors"
-
-import "encoding/json"
+import (
+	"bytes"
+	"encoding/json"
+	"errors"
+)
 
 func UnmarshalDeviceListItem(data []byte) (DeviceListItem, error) {
 	var r DeviceListItem
@@ -179,6 +180,16 @@ func UnmarshalLicenseInfo(data []byte) (LicenseInfo, error) {
 }
 
 func (r *LicenseInfo) Marshal() ([]byte, error) {
+	return json.Marshal(r)
+}
+
+func UnmarshalSystemVersion(data []byte) (SystemVersion, error) {
+	var r SystemVersion
+	err := json.Unmarshal(data, &r)
+	return r, err
+}
+
+func (r *SystemVersion) Marshal() ([]byte, error) {
 	return json.Marshal(r)
 }
 
@@ -374,17 +385,17 @@ func (r *RemoteServerConfig) Marshal() ([]byte, error) {
 
 // 设备列表项（f=5 响应）
 type DeviceListItem struct {
-	AndroidVersion *string `json:"androidVersion,omitempty"`
-	CPU int `json:"cpu"`
-	DiskSize       interface{}  `json:"diskSize"`
-	Height int `json:"height"`
-	Memory         interface{}  `json:"memory"`
-	Model          string  `json:"model"`
-	OSVersion      string  `json:"osVersion"`
-	Seat int `json:"seat"`
-	Type int `json:"type"`
-	UUID           string  `json:"uuid"`
-	Width int `json:"width"`
+	AndroidVersion *string     `json:"androidVersion,omitempty"`
+	CPU            int         `json:"cpu"`
+	DiskSize       interface{} `json:"diskSize"`
+	Height         int         `json:"height"`
+	Memory         interface{} `json:"memory"`
+	Model          string      `json:"model"`
+	OSVersion      string      `json:"osVersion"`
+	Seat           int         `json:"seat"`
+	Type           int         `json:"type"`
+	UUID           string      `json:"uuid"`
+	Width          int         `json:"width"`
 }
 
 // 验证码数据
@@ -407,7 +418,7 @@ type LicenseData struct {
 	N         string  `json:"N"`
 	S         bool    `json:"S"`
 	Sn        string  `json:"SN"`
-	Status int `json:"status"`
+	Status    int     `json:"status"`
 	StatusTxt string  `json:"statusTxt"`
 	T         float64 `json:"T"`
 	Used      float64 `json:"used"`
@@ -430,25 +441,25 @@ type OnlineStatus struct {
 	IsManagementOnline   bool    `json:"isManagementOnline"`
 	IsUSBMode            bool    `json:"isUSBMode"`
 	Online               float64 `json:"online"`
-	Seat int `json:"seat"`
+	Seat                 int     `json:"seat"`
 	Time                 *IL     `json:"time"`
 }
 
 // Shell 执行结果 (f=289)
 type ShellResult struct {
-	Error    *string  `json:"error,omitempty"`
-	ExitCode *int `json:"exitCode,omitempty"`
-	Output   string   `json:"output"`
+	Error    *string `json:"error,omitempty"`
+	ExitCode *int    `json:"exitCode,omitempty"`
+	Output   string  `json:"output"`
 }
 
 // App 信息 (f=290)
 type AppInfo struct {
-	AppName     string   `json:"appName"`
-	InstallTime *IL      `json:"installTime"`
-	PackageName string   `json:"packageName"`
-	Size        *IL      `json:"size"`
-	VersionCode *int `json:"versionCode,omitempty"`
-	VersionName *string  `json:"versionName,omitempty"`
+	AppName     string  `json:"appName"`
+	InstallTime *IL     `json:"installTime"`
+	PackageName string  `json:"packageName"`
+	Size        *IL     `json:"size"`
+	VersionCode *int    `json:"versionCode,omitempty"`
+	VersionName *string `json:"versionName,omitempty"`
 }
 
 // 设备详细信息 (f=4)
@@ -458,9 +469,9 @@ type DeviceDetail struct {
 	AppVersion     *string  `json:"appVersion,omitempty"`
 	Brand          string   `json:"brand"`
 	Country        string   `json:"country"`
-	CPU int  `json:"cpu"`
+	CPU            int      `json:"cpu"`
 	DiskSize       *IL      `json:"diskSize"`
-	Height int  `json:"height"`
+	Height         int      `json:"height"`
 	Lang           string   `json:"lang"`
 	Location       *string  `json:"location,omitempty"`
 	Memory         *IL      `json:"memory"`
@@ -468,25 +479,35 @@ type DeviceDetail struct {
 	Orientation    float64  `json:"orientation"`
 	OS             string   `json:"os"`
 	OSVersion      string   `json:"osVersion"`
-	Seat int  `json:"seat"`
+	Seat           int      `json:"seat"`
 	Self           *string  `json:"self,omitempty"`
 	SignalMode     *string  `json:"signalMode,omitempty"`
 	SysPer         *float64 `json:"sysPer,omitempty"`
 	SysVersion     *string  `json:"sysVersion,omitempty"`
 	Timezone       string   `json:"timezone"`
-	Type int  `json:"type"`
+	Type           int      `json:"type"`
 	UUID           string   `json:"uuid"`
 	Vendor         *string  `json:"vendor,omitempty"`
-	Width int  `json:"width"`
+	Width          int      `json:"width"`
 }
 
 // 授权信息
 type LicenseInfo struct {
-	ExpireTime *IL      `json:"expireTime"`
-	MaxDevices int  `json:"maxDevices"`
-	Status *int `json:"status,omitempty"`
-	StatusTxt  *string  `json:"statusTxt,omitempty"`
-	Valid      bool     `json:"valid"`
+	ExpireTime *IL     `json:"expireTime"`
+	MaxDevices int     `json:"maxDevices"`
+	Status     *int    `json:"status,omitempty"`
+	StatusTxt  *string `json:"statusTxt,omitempty"`
+	Valid      bool    `json:"valid"`
+}
+
+// 系统版本信息
+type SystemVersion struct {
+	Version   string  `json:"version"`
+	Project   *string `json:"project,omitempty"`
+	Timestamp *int64  `json:"timestamp,omitempty"`
+	Arch      *string `json:"arch,omitempty"`
+	OS        *string `json:"os,omitempty"`
+	Info      *string `json:"info,omitempty"`
 }
 
 // 网络信息
@@ -536,16 +557,16 @@ type ROMFlashProgressData struct {
 	LastError *string `json:"lastError,omitempty"`
 	Message   string  `json:"message"`
 	Progress  float64 `json:"progress"`
-	Seat int `json:"seat"`
+	Seat      int     `json:"seat"`
 	StartTime *IL     `json:"startTime"`
-	Status int `json:"status"`
+	Status    int     `json:"status"`
 	Step      string  `json:"step"`
 }
 
 // 批量操作结果
 type BatchOperationResult struct {
 	Error   interface{} `json:"error"`
-	Seat int     `json:"seat"`
+	Seat    int         `json:"seat"`
 	Success bool        `json:"success"`
 }
 
@@ -559,7 +580,7 @@ type FlashTaskStatus struct {
 	QueueTime *IL     `json:"queueTime"`
 	Session   string  `json:"session"`
 	StartTime *IL     `json:"startTime"`
-	Status int `json:"status"`
+	Status    int     `json:"status"`
 	TaskID    string  `json:"taskId"`
 }
 
@@ -583,7 +604,7 @@ type DownloadTask struct {
 	Progress       float64 `json:"progress"`
 	Sha256         *string `json:"sha256,omitempty"`
 	Speed          float64 `json:"speed"`
-	Status int `json:"status"`
+	Status         int     `json:"status"`
 	TaskID         string  `json:"taskId"`
 	TotalSize      *IL     `json:"totalSize"`
 	URL            string  `json:"url"`
@@ -610,32 +631,32 @@ type UIElement struct {
 
 // 基础 WebSocket 消息体
 type WSBaseMessage struct {
-	Code *int    `json:"code,omitempty"`
+	Code *int        `json:"code,omitempty"`
 	Data interface{} `json:"data"`
-	F *int    `json:"f,omitempty"`
+	F    *int        `json:"f,omitempty"`
 	Msg  *string     `json:"msg,omitempty"`
 	Req  *bool       `json:"req,omitempty"`
-	Seq *int    `json:"seq,omitempty"`
+	Seq  *int        `json:"seq,omitempty"`
 }
 
 // WebSocket 响应消息
 type WSResponse struct {
-	Code *int    `json:"code,omitempty"`
+	Code *int        `json:"code,omitempty"`
 	Data interface{} `json:"data"`
-	F *int    `json:"f,omitempty"`
+	F    *int        `json:"f,omitempty"`
 	Msg  *string     `json:"msg,omitempty"`
 	Req  *bool       `json:"req,omitempty"`
-	Seq *int    `json:"seq,omitempty"`
+	Seq  *int        `json:"seq,omitempty"`
 }
 
 // WebSocket 推送消息
 type WSPushMessage struct {
-	Code *int    `json:"code,omitempty"`
+	Code *int        `json:"code,omitempty"`
 	Data interface{} `json:"data"`
-	F int     `json:"f"`
+	F    int         `json:"f"`
 	Msg  *string     `json:"msg,omitempty"`
 	Req  bool        `json:"req"`
-	Seq *int    `json:"seq,omitempty"`
+	Seq  *int        `json:"seq,omitempty"`
 }
 
 // 中间件客户端配置
@@ -733,113 +754,113 @@ func (x *IL) MarshalJSON() ([]byte, error) {
 
 func unmarshalUnion(data []byte, pi **int64, pf **float64, pb **bool, ps **string, haveArray bool, pa interface{}, haveObject bool, pc interface{}, haveMap bool, pm interface{}, haveEnum bool, pe interface{}, nullable bool) (bool, error) {
 	if pi != nil {
-			*pi = nil
+		*pi = nil
 	}
 	if pf != nil {
-			*pf = nil
+		*pf = nil
 	}
 	if pb != nil {
-			*pb = nil
+		*pb = nil
 	}
 	if ps != nil {
-			*ps = nil
+		*ps = nil
 	}
 
 	dec := json.NewDecoder(bytes.NewReader(data))
 	dec.UseNumber()
 	tok, err := dec.Token()
 	if err != nil {
-			return false, err
+		return false, err
 	}
 
 	switch v := tok.(type) {
 	case json.Number:
-			if pi != nil {
-					i, err := v.Int64()
-					if err == nil {
-							*pi = &i
-							return false, nil
-					}
+		if pi != nil {
+			i, err := v.Int64()
+			if err == nil {
+				*pi = &i
+				return false, nil
 			}
-			if pf != nil {
-					f, err := v.Float64()
-					if err == nil {
-							*pf = &f
-							return false, nil
-					}
-					return false, errors.New("Unparsable number")
+		}
+		if pf != nil {
+			f, err := v.Float64()
+			if err == nil {
+				*pf = &f
+				return false, nil
 			}
-			return false, errors.New("Union does not contain number")
+			return false, errors.New("Unparsable number")
+		}
+		return false, errors.New("Union does not contain number")
 	case float64:
-			return false, errors.New("Decoder should not return float64")
+		return false, errors.New("Decoder should not return float64")
 	case bool:
-			if pb != nil {
-					*pb = &v
-					return false, nil
-			}
-			return false, errors.New("Union does not contain bool")
+		if pb != nil {
+			*pb = &v
+			return false, nil
+		}
+		return false, errors.New("Union does not contain bool")
 	case string:
-			if haveEnum {
-					return false, json.Unmarshal(data, pe)
-			}
-			if ps != nil {
-					*ps = &v
-					return false, nil
-			}
-			return false, errors.New("Union does not contain string")
+		if haveEnum {
+			return false, json.Unmarshal(data, pe)
+		}
+		if ps != nil {
+			*ps = &v
+			return false, nil
+		}
+		return false, errors.New("Union does not contain string")
 	case nil:
-			if nullable {
-					return false, nil
-			}
-			return false, errors.New("Union does not contain null")
+		if nullable {
+			return false, nil
+		}
+		return false, errors.New("Union does not contain null")
 	case json.Delim:
-			if v == '{' {
-					if haveObject {
-							return true, json.Unmarshal(data, pc)
-					}
-					if haveMap {
-							return false, json.Unmarshal(data, pm)
-					}
-					return false, errors.New("Union does not contain object")
+		if v == '{' {
+			if haveObject {
+				return true, json.Unmarshal(data, pc)
 			}
-			if v == '[' {
-					if haveArray {
-							return false, json.Unmarshal(data, pa)
-					}
-					return false, errors.New("Union does not contain array")
+			if haveMap {
+				return false, json.Unmarshal(data, pm)
 			}
-			return false, errors.New("Cannot handle delimiter")
+			return false, errors.New("Union does not contain object")
+		}
+		if v == '[' {
+			if haveArray {
+				return false, json.Unmarshal(data, pa)
+			}
+			return false, errors.New("Union does not contain array")
+		}
+		return false, errors.New("Cannot handle delimiter")
 	}
 	return false, errors.New("Cannot unmarshal union")
 }
 
 func marshalUnion(pi *int64, pf *float64, pb *bool, ps *string, haveArray bool, pa interface{}, haveObject bool, pc interface{}, haveMap bool, pm interface{}, haveEnum bool, pe interface{}, nullable bool) ([]byte, error) {
 	if pi != nil {
-			return json.Marshal(*pi)
+		return json.Marshal(*pi)
 	}
 	if pf != nil {
-			return json.Marshal(*pf)
+		return json.Marshal(*pf)
 	}
 	if pb != nil {
-			return json.Marshal(*pb)
+		return json.Marshal(*pb)
 	}
 	if ps != nil {
-			return json.Marshal(*ps)
+		return json.Marshal(*ps)
 	}
 	if haveArray {
-			return json.Marshal(pa)
+		return json.Marshal(pa)
 	}
 	if haveObject {
-			return json.Marshal(pc)
+		return json.Marshal(pc)
 	}
 	if haveMap {
-			return json.Marshal(pm)
+		return json.Marshal(pm)
 	}
 	if haveEnum {
-			return json.Marshal(pe)
+		return json.Marshal(pe)
 	}
 	if nullable {
-			return json.Marshal(nil)
+		return json.Marshal(nil)
 	}
 	return nil, errors.New("Union must not be null")
 }

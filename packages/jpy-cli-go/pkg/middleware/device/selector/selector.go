@@ -24,6 +24,7 @@ type SelectionOptions struct {
 	USB            *bool
 	BizOnline      *bool
 	HasIP          *bool
+	HasUUID        *bool
 	AuthorizedOnly bool
 	Interactive    bool
 }
@@ -144,6 +145,13 @@ func SelectDevices(opts SelectionOptions) ([]model.DeviceInfo, error) {
 				continue
 			}
 		}
+		// UUID Filter
+		if opts.HasUUID != nil {
+			hasUUID := d.UUID != ""
+			if hasUUID != *opts.HasUUID {
+				continue
+			}
+		}
 		filtered = append(filtered, d)
 	}
 
@@ -178,7 +186,7 @@ func filterAuthorizedServers(servers []config.LocalServerConfig) []config.LocalS
 			// Based on `auto-auth`, it uses empty token.
 			client := httpclient.NewClient(server.URL, "")
 			info, err := client.GetLicense()
-			if err == nil && info != nil && info.StatusTxt != nil && *info.StatusTxt == "成功" {
+			if err == nil && info != nil && info.StatusTxt == "成功" {
 				mu.Lock()
 				authorized = append(authorized, server)
 				mu.Unlock()

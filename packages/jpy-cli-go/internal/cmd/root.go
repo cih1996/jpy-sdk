@@ -6,6 +6,7 @@ import (
 	configCmd "jpy-cli/internal/cmd/config"
 	logCmd "jpy-cli/internal/cmd/log"
 	"jpy-cli/internal/cmd/middleware"
+	"jpy-cli/internal/cmd/server"
 	"jpy-cli/internal/cmd/tools"
 	"jpy-cli/pkg/config"
 	"jpy-cli/pkg/logger"
@@ -141,12 +142,23 @@ var rootCmd = &cobra.Command{
 func Execute() {
 	rootCmd.PersistentFlags().BoolVar(&debug, "debug", false, "启用调试日志")
 	rootCmd.PersistentFlags().StringVar(&logLevel, "log-level", "info", "设置日志级别 (debug, info, warn, error)")
+	// SSH server command
+	rootCmd.AddCommand(server.NewSSHServerCmd())
 
 	// Middleware commands
 	rootCmd.AddCommand(middleware.NewMiddlewareCmd())
 
 	// Tools commands
 	rootCmd.AddCommand(tools.NewToolsCmd())
+
+	// Server Commands
+	serverCmd := &cobra.Command{
+		Use:   "server",
+		Short: "启动服务端功能 (SSH/Web)",
+	}
+	serverCmd.AddCommand(server.NewSSHServerCmd())
+	serverCmd.AddCommand(server.NewWebServerCmd())
+	rootCmd.AddCommand(serverCmd)
 
 	// Config commands
 	rootCmd.AddCommand(configCmd.NewConfigCmd())

@@ -11,6 +11,7 @@ func NewAdminCmd() *cobra.Command {
 	}
 
 	cmd.AddCommand(NewAutoAuthCmd())
+	cmd.AddCommand(NewUpdateClusterCmd())
 
 	return cmd
 }

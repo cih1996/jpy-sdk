@@ -36,6 +36,10 @@ jpy-cli [scope] [resource] [action] [flags]
 | `--filter-online`| | 按设备在线状态筛选。 | `--filter-online true` |
 | `--filter-adb` | | 按 ADB 开启状态筛选。 | `--filter-adb true` |
 | `--filter-usb` | | 按 USB 模式筛选 (true=Device/USB, false=Host/OTG)。 | `--filter-usb false` |
+| `--filter-uuid` | | 筛选UUID存在状态 (true/false)。 | `--filter-uuid true` |
+| `--filter-has-ip` | | 筛选IP存在状态 (true/false)。 | `--filter-has-ip false` |
+| `--uuid-count-gt` | | 筛选UUID数量大于指定值的服务器。 | `--uuid-count-gt 10` |
+| `--uuid-count-lt` | | 筛选UUID数量小于指定值的服务器。 | `--uuid-count-lt 5` |
 
 ---
 
@@ -48,9 +52,40 @@ jpy-cli [scope] [resource] [action] [flags]
 - **意图**: 获取符合条件的设备详细列表。
 - **语法**: `jpy-cli middleware device list [flags]`
 
+#### `export`
+- **意图**: 导出设备信息到文件，支持自定义字段。
+- **语法**: `jpy-cli middleware device export [output-file] [flags]`
+- **关键标志**:
+    - `--export-id`: 导出设备ID（根据服务器地址生成）。
+    - `--export-ip`: 导出设备IP地址。
+    - `--export-uuid`: 导出设备序列号。
+    - `--export-seat`: 导出设备机位号。
+    - `--export-auto`: 智能导出模式：自动补齐缺失的IP地址（适用于有SN但IP读取失败的设备），只导出有UUID的设备，并记录统计信息。
+- **默认行为**: 如果不指定任何标志，导出所有字段，格式为：`ID\tUUID\tIP\tSeat`
+- **使用场景**:
+  - **DHCP配置**: 当部分设备IP读取失败但SN存在时，使用 `--export-auto` 模式可以智能推断并补齐缺失的IP地址，生成完整的设备列表用于DHCP服务器配置
+  - **批量设备管理**: 导出设备信息用于自动化脚本处理
+  - **设备清单**: 创建完整的设备清单，包含所有必要的连接信息
+
 #### `status`
 - **意图**: 获取聚合的服务器状态和设备计数。
 - **语法**: `jpy-cli middleware device status [flags]`
+- **关键标志**:
+    - `--detail`: 显示详细授权信息 (SN, 集控平台地址, 授权名称)。
+    - **高级筛选**:
+        - `--auth-failed`: 筛选授权状态非成功的服务器。
+        - `--fw-has`: 筛选固件版本包含指定字符串的服务器。
+        - `--fw-not`: 筛选固件版本不包含指定字符串的服务器。
+        - `--speed-gt`: 筛选网络速率大于指定值(Mbps)的服务器。
+        - `--speed-lt`: 筛选网络速率小于指定值(Mbps)的服务器。
+        - `--cluster-contains`: 筛选集控平台地址包含指定字符串的服务器。
+        - `--cluster-not-contains`: 筛选集控平台地址不包含指定字符串的服务器。
+        - `--sn-gt`: 筛选序列号大于指定值的服务器 (字符串比较)。
+        - `--sn-lt`: 筛选序列号小于指定值的服务器 (字符串比较)。
+        - `--ip-count-gt`: 筛选IP数大于指定值的服务器。
+        - `--ip-count-lt`: 筛选IP数小于指定值的服务器。
+        - `--biz-online-gt`: 筛选业务在线数大于指定值的服务器。
+        - `--biz-online-lt`: 筛选业务在线数小于指定值的服务器。
 
 #### `reboot`
 - **意图**: 对设备进行电源循环 (重启)。
@@ -128,6 +163,20 @@ jpy-cli [scope] [resource] [action] [flags]
 - **意图**: 从 JSON 文件批量导入服务器。
 - **语法**: `jpy-cli middleware auth import [file]`
 
+#### `ssh`
+- **意图**: 通过 SSH 连接中间件服务器 (自动获取 Root 密码)。
+- **语法**: `jpy-cli middleware ssh [ip]`
+- **前置条件**: 需要运维登录 (Operation Login)，CLI 会自动处理。
+- **行为**:
+    1. 连接 22 端口获取 Banner 密钥。
+    2. 使用 Admin API 解密 Root 密码。
+    3. 生成连接命令 (若安装了 `sshpass` 则直接生成可执行命令)。
+
+#### `restart`
+- **意图**: 重启选中设备的 boxCore 服务。
+- **语法**: `jpy-cli middleware restart [flags]`
+- **注意**: 支持并发执行和通用筛选器（分组、服务器、UUID、机位等）。
+
 ---
 
 ### 3.3 范围: 管理员 (`admin`)
@@ -136,6 +185,15 @@ jpy-cli [scope] [resource] [action] [flags]
 #### `middleware admin auto-auth`
 - **意图**: 自动扫描并授权待处理的中间件服务器。
 - **语法**: `jpy-cli middleware admin auto-auth`
+
+#### `middleware admin update-cluster`
+- **意图**: 批量更新中间件服务器的集控平台地址 (MgtCenter) 并与管理后台同步。
+- **语法**: `jpy-cli middleware admin update-cluster [new_address] [flags]`
+- **关键标志**:
+    - `--server`: 筛选服务器地址/名称 (支持正则)。
+    - `--group`: 指定服务器分组。
+    - `--authorized`: 按授权状态筛选 (true/false)。
+    - `--force`: 强制更新（即使地址一致也重新提交）。
 
 #### `admin device generate`
 - **意图**: 生成新的授权码。
@@ -201,6 +259,38 @@ jpy-cli [scope] [resource] [action] [flags]
   jpy-cli middleware device log -s "192.168.1.100" --seat 5
   ```
 
+**场景 5: 按UUID状态筛选设备**
+- **用户意图**: "只列出有UUID的设备。"
+- **推理**: 使用 `--filter-uuid true` 筛选有UUID的设备。
+- **命令**:
+  ```bash
+  jpy-cli middleware device list --filter-uuid true
+  ```
+
+**场景 6: 按UUID数量筛选服务器**
+- **用户意图**: "显示UUID数量大于10的服务器。"
+- **推理**: 使用 `--uuid-count-gt 10` 按UUID数量筛选服务器。
+- **命令**:
+  ```bash
+  jpy-cli middleware device status --uuid-count-gt 10
+  ```
+
+**场景 7: 导出设备信息到文件**
+- **用户意图**: "将所有在线设备的ID和UUID导出到文件。"
+- **推理**: 使用 `--filter-online true` 筛选在线设备，使用 `--export-id` 和 `--export-uuid` 导出指定字段。
+- **命令**:
+  ```bash
+  jpy-cli middleware device export devices.txt --export-id --export-uuid --filter-online true
+  ```
+
+**场景 8: 导出特定服务器设备信息**
+- **用户意图**: "导出192.168.1网段所有设备的完整信息。"
+- **推理**: 使用 `-s "192.168.1"` 筛选特定服务器，不指定导出字段时默认导出所有字段。
+- **命令**:
+  ```bash
+  jpy-cli middleware device export 192_168_1_devices.txt -s "192.168.1"
+  ```
+
 ### 4.2 服务器维护场景
 
 **场景 5: 清理死链服务器**
@@ -259,6 +349,17 @@ jpy-cli [scope] [resource] [action] [flags]
 
 ## 6. 实战场景
 
+# 添加、切换中间件服务器分组
+1. 查看当前活动/选择分组
+.\jpy.exe middleware auth select
+
+2. 选择使用指定分组内的服务器
+.\jpy.exe middleware auth select [group]
+
+3. 添加服务器到当前活动分组
+.\jpy.exe middleware auth login "192.168.0.102" -u admin -p admin
+
+
 # 设备初次上线没有获取到IP，需尝试切换USB和OTG使得设备成功获取到IP
 1. 将已授权的服务器，没有IP及当前处于OTG的设备切换到USB模式
 .\jpy.exe middleware device usb --mode usb --authorized --filter-has-ip false --filter-usb false
@@ -297,3 +398,19 @@ jpy-cli [scope] [resource] [action] [flags]
 2. 根据列出的设备随意抽查1个去获取设备内的日志
 .\jpy.exe middleware device log --server 192.168.10.206 --seat 12
 
+
+# 添加、切换中间件服务器分组
+1. 查看当前活动/选择分组
+.\jpy.exe middleware auth select
+
+2. 选择使用指定分组内的服务器
+.\jpy.exe middleware auth select [group]
+
+3. 添加服务器到当前活动分组
+.\jpy.exe middleware auth login "192.168.0.102" -u admin -p admin
+
+# 获取中间件root密码（连接到中间件shell需要）
+.\jpy.exe middleware ssh "192.168.0.102"
+
+# 查看某个设备的日志
+.\jpy.exe middleware device log --server 192.168.0.102 --seat 12

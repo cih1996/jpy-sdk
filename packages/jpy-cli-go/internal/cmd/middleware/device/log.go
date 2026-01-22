@@ -8,6 +8,7 @@ import (
 	"jpy-cli/pkg/middleware/device/selector"
 	"jpy-cli/pkg/middleware/device/terminal"
 	"jpy-cli/pkg/middleware/model"
+	"strings"
 
 	"os"
 	"os/signal"
@@ -170,9 +171,22 @@ func NewLogCmd() *cobra.Command {
 				return fmt.Errorf("终端初始化失败: %v", err)
 			}
 
-			fmt.Println("等待终端就绪...")
-			if err := term.WaitForReady(5 * time.Second); err != nil {
-				return fmt.Errorf("终端未就绪: %v", err)
+			fmt.Println("等待终端就绪 (等待 '$' 提示符)...")
+
+			timeout := time.After(5 * time.Second)
+
+		WaitLoop:
+			for {
+				select {
+				case line := <-term.Output:
+					if strings.Contains(line, "$") || strings.Contains(line, "#") {
+						break WaitLoop
+					}
+				case <-timeout:
+					return fmt.Errorf("等待终端就绪超时 (5秒)")
+				case <-term.Closed:
+					return fmt.Errorf("终端连接意外关闭")
+				}
 			}
 
 			// 4. Execute Command

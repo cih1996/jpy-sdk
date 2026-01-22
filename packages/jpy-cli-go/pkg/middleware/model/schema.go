@@ -10,7 +10,7 @@ const (
 	FuncSwitchUSBGuard = 106
 	FuncPowerControl   = 107
 	FuncEnableADB      = 109
-	
+
 	// Terminal
 	FuncTerminalInit = 9
 
@@ -18,6 +18,10 @@ const (
 	FuncRebootDeviceMirror = 155
 	FuncSwitchUSBMirror    = 218
 	FuncControlADBMirror   = 219
+
+	// Cluster/System Info
+	FuncGetSystemVersion = 110
+	FuncGetNetworkInfo   = 112
 )
 
 // ServerStatus represents the aggregated status of a server

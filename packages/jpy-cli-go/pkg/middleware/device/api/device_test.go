@@ -40,7 +40,7 @@ func TestFetchDeviceList_Success(t *testing.T) {
 	}
 
 	transport := &MockTransport{Response: resp}
-	api := NewDeviceAPI(transport)
+	api := NewDeviceAPI(transport, "http://mock", "token")
 
 	devices, err := api.FetchDeviceList()
 	if err != nil {
@@ -57,7 +57,7 @@ func TestFetchDeviceList_Success(t *testing.T) {
 
 func TestFetchDeviceList_Error(t *testing.T) {
 	transport := &MockTransport{Error: errors.New("connection failed")}
-	api := NewDeviceAPI(transport)
+	api := NewDeviceAPI(transport, "http://mock", "token")
 
 	_, err := api.FetchDeviceList()
 	if err == nil {

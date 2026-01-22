@@ -165,6 +165,7 @@ func NewListCmd() *cobra.Command {
 			}
 
 			fmt.Println(lipgloss.NewStyle().Bold(true).Render(summary))
+
 			return nil
 		},
 	}

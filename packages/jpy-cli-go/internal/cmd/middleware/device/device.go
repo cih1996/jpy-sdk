@@ -12,6 +12,7 @@ func NewDeviceCmd() *cobra.Command {
 
 	cmd.AddCommand(NewStatusCmd())
 	cmd.AddCommand(NewListCmd())
+	cmd.AddCommand(NewExportCmd())
 	cmd.AddCommand(NewRebootCmd())
 	cmd.AddCommand(NewUSBCmd())
 	cmd.AddCommand(NewADBCmd())

@@ -1,0 +1,26 @@
+[
+  {
+    "name": "查看设备列表",
+    "cmd": "jpy middleware device list"
+  },
+  {
+    "name": "查看中间件状态",
+    "cmd": "jpy middleware status"
+  },
+  {
+    "name": "重启中间件",
+    "cmd": "jpy middleware restart"
+  },
+  {
+    "name": "帮助",
+    "cmd": "jpy --help"
+  },
+  {
+    "name": "清屏",
+    "cmd": "clear"
+  },
+  {
+    "name": "退出",
+    "cmd": "exit"
+  }
+]
