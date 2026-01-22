@@ -1,4 +1,0 @@
-log_level: debug
-log_output: file # console, file, both
-max_concurrency: 5
-connect_timeout: 3 # seconds
