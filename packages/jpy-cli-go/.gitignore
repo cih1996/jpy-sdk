@@ -1,0 +1,5 @@
+bin/
+jpy
+config.json
+*.log
+tools/temp_types.ts

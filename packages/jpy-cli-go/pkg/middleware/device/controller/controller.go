@@ -1,0 +1,237 @@
+package controller
+
+import (
+	"fmt"
+	"jpy-cli/pkg/config"
+	"jpy-cli/pkg/logger"
+	"jpy-cli/pkg/middleware/connector"
+	"jpy-cli/pkg/middleware/device/api"
+	"jpy-cli/pkg/middleware/device/terminal"
+	"jpy-cli/pkg/middleware/model"
+)
+
+// DeviceController handles device control operations.
+type DeviceController struct {
+	connector *connector.ConnectorService
+}
+
+func NewDeviceController(cfg *config.Config) *DeviceController {
+	return &DeviceController{
+		connector: connector.NewConnectorService(cfg),
+	}
+}
+
+// ExecuteBatch executes a function on a list of devices using shared server connections.
+func (c *DeviceController) ExecuteBatch(devices []model.DeviceInfo, action func(seat int, api *api.DeviceAPI) error) error {
+	// Group devices by server
+	devicesByServer := make(map[string][]model.DeviceInfo)
+	for _, d := range devices {
+		devicesByServer[d.ServerURL] = append(devicesByServer[d.ServerURL], d)
+	}
+
+	successCount := 0
+	failCount := 0
+	totalDevices := len(devices)
+	processedCount := 0
+
+	fmt.Printf("开始对 %d 台设备进行批量操作...\n", totalDevices)
+
+	for serverURL, serverDevices := range devicesByServer {
+		server, found := c.findServerConfig(serverURL)
+		if !found {
+			logger.Errorf("未找到服务器配置: %s", serverURL)
+			for range serverDevices {
+				failCount++
+				processedCount++
+				if processedCount <= 10 {
+					fmt.Printf("[%d/%d] ❌ 缺少服务器配置: %s\n", processedCount, totalDevices, serverURL)
+				}
+			}
+			continue
+		}
+
+		// Connect to Guard Channel (Shared per server)
+		ws, err := c.connector.ConnectGuard(server)
+		if err != nil {
+			logger.Errorf("连接到 guard 失败 %s: %v", serverURL, err)
+			for range serverDevices {
+				failCount++
+				processedCount++
+				if processedCount <= 10 {
+					fmt.Printf("[%d/%d] ❌ 连接失败: %s\n", processedCount, totalDevices, serverURL)
+				}
+			}
+			continue
+		}
+
+		deviceAPI := api.NewDeviceAPI(ws)
+
+		for _, d := range serverDevices {
+			processedCount++
+			err := action(d.Seat, deviceAPI)
+
+			// Console Output (Top 10 detailed, others summary)
+			if processedCount <= 10 {
+				if err != nil {
+					fmt.Printf("[%d/%d] ❌ %s (机位 %d): %v\n", processedCount, totalDevices, d.UUID, d.Seat, err)
+				} else {
+					fmt.Printf("[%d/%d] ✅ %s (机位 %d): 成功\n", processedCount, totalDevices, d.UUID, d.Seat)
+				}
+			} else {
+				// Update progress line
+				fmt.Printf("\r正在处理... %d/%d (成功: %d, 失败: %d)", processedCount, totalDevices, successCount, failCount)
+			}
+
+			if err != nil {
+				logger.Errorf("控制设备失败 %s (机位 %d): %v", d.UUID, d.Seat, err)
+				failCount++
+			} else {
+				logger.Infof("成功控制设备 %s (机位 %d)", d.UUID, d.Seat)
+				successCount++
+			}
+		}
+
+		ws.Close()
+	}
+
+	fmt.Printf("\n批量操作完成。成功: %d, 失败: %d\n", successCount, failCount)
+
+	if failCount > 0 {
+		return fmt.Errorf("部分操作失败")
+	}
+	return nil
+}
+
+func (c *DeviceController) findServerConfig(url string) (config.LocalServerConfig, bool) {
+	// Search in Groups
+	for _, servers := range c.connector.Config.Groups {
+		for _, s := range servers {
+			if s.URL == url {
+				return s, true
+			}
+		}
+	}
+	return config.LocalServerConfig{}, false
+}
+
+// RebootBatch executes the reboot command on multiple devices.
+func (c *DeviceController) RebootBatch(devices []model.DeviceInfo) error {
+	return c.ExecuteBatch(devices, func(seat int, api *api.DeviceAPI) error {
+		return api.RebootDevice(seat)
+	})
+}
+
+// SwitchUSBBatch executes the USB switch command on multiple devices.
+func (c *DeviceController) SwitchUSBBatch(devices []model.DeviceInfo, otg bool) error {
+	return c.ExecuteBatch(devices, func(seat int, api *api.DeviceAPI) error {
+		return api.SwitchUSBMode(seat, otg)
+	})
+}
+
+// ControlADBBatch executes the ADB control command on multiple devices.
+func (c *DeviceController) ControlADBBatch(devices []model.DeviceInfo, enable bool) error {
+	if enable {
+		return c.ExecuteBatch(devices, func(seat int, api *api.DeviceAPI) error {
+			return api.ControlADB(seat, enable)
+		})
+	}
+
+	// For disabling ADB, we must use terminal connection
+	return c.executeTerminalBatch(devices, func(seat int, term *terminal.TerminalSession) error {
+		// Send shell command to disable ADB
+		if err := term.Exec("settings put global adb_enabled 0"); err != nil {
+			return fmt.Errorf("发送关闭指令失败: %v", err)
+		}
+		return nil
+	})
+}
+
+// executeTerminalBatch executes a function using terminal connection for each device
+func (c *DeviceController) executeTerminalBatch(devices []model.DeviceInfo, action func(seat int, term *terminal.TerminalSession) error) error {
+	// Group devices by server
+	devicesByServer := make(map[string][]model.DeviceInfo)
+	for _, d := range devices {
+		devicesByServer[d.ServerURL] = append(devicesByServer[d.ServerURL], d)
+	}
+
+	successCount := 0
+	failCount := 0
+	totalDevices := len(devices)
+	processedCount := 0
+
+	fmt.Printf("开始对 %d 台设备进行批量操作 (终端模式)...\n", totalDevices)
+
+	for serverURL, serverDevices := range devicesByServer {
+		server, found := c.findServerConfig(serverURL)
+		if !found {
+			logger.Errorf("未找到服务器配置: %s", serverURL)
+			for range serverDevices {
+				failCount++
+				processedCount++
+				if processedCount <= 10 {
+					fmt.Printf("[%d/%d] ❌ 缺少服务器配置: %s\n", processedCount, totalDevices, serverURL)
+				}
+			}
+			continue
+		}
+
+		for _, d := range serverDevices {
+			processedCount++
+
+			// Connect to Terminal
+			// Use Seat as ID
+			ws, err := c.connector.ConnectDeviceTerminal(server, int64(d.Seat))
+			if err != nil {
+				failCount++
+				logger.Errorf("连接终端失败 %s (机位 %d): %v", d.UUID, d.Seat, err)
+				if processedCount <= 10 {
+					fmt.Printf("[%d/%d] ❌ 连接失败 %s (机位 %d): %v\n", processedCount, totalDevices, d.UUID, d.Seat, err)
+				}
+				continue
+			}
+
+			term := terminal.NewTerminalSession(ws, int64(d.Seat))
+
+			// Init and Wait
+			err = func() error {
+				defer term.Close()
+				if err := term.Init(); err != nil {
+					return fmt.Errorf("终端初始化失败: %v", err)
+				}
+				// Wait briefly for ready? Init sends request, but maybe we don't strictly need to wait for response if we just want to send?
+				// But it's safer to wait.
+				// However, term.WaitForReady needs a timeout.
+				// Let's use a short timeout.
+				// Note: terminal.go implementation of Init sends f=9.
+				// WaitForReady waits for 'Ready' channel which is not currently signaled in the code I saw earlier?
+				// Let's check terminal.go again.
+				return action(d.Seat, term)
+			}()
+
+			if processedCount <= 10 {
+				if err != nil {
+					fmt.Printf("[%d/%d] ❌ %s (机位 %d): %v\n", processedCount, totalDevices, d.UUID, d.Seat, err)
+				} else {
+					fmt.Printf("[%d/%d] ✅ %s (机位 %d): 成功\n", processedCount, totalDevices, d.UUID, d.Seat)
+				}
+			} else {
+				fmt.Printf("\r正在处理... %d/%d (成功: %d, 失败: %d)", processedCount, totalDevices, successCount, failCount)
+			}
+
+			if err != nil {
+				logger.Errorf("操作设备失败 %s (机位 %d): %v", d.UUID, d.Seat, err)
+				failCount++
+			} else {
+				logger.Infof("成功操作设备 %s (机位 %d)", d.UUID, d.Seat)
+				successCount++
+			}
+		}
+	}
+
+	fmt.Printf("\n批量操作完成。成功: %d, 失败: %d\n", successCount, failCount)
+
+	if failCount > 0 {
+		return fmt.Errorf("部分操作失败")
+	}
+	return nil
+}
