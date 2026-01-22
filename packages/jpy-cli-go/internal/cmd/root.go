@@ -6,6 +6,7 @@ import (
 	configCmd "jpy-cli/internal/cmd/config"
 	logCmd "jpy-cli/internal/cmd/log"
 	"jpy-cli/internal/cmd/middleware"
+	"jpy-cli/internal/cmd/proxy"
 	"jpy-cli/internal/cmd/server"
 	"jpy-cli/internal/cmd/tools"
 	"jpy-cli/pkg/config"
@@ -162,6 +163,9 @@ func Execute() {
 
 	// Config commands
 	rootCmd.AddCommand(configCmd.NewConfigCmd())
+
+	// Proxy command
+	rootCmd.AddCommand(proxy.NewProxyCmd())
 
 	// Log commands
 	rootCmd.AddCommand(logCmd.NewLogCmd())

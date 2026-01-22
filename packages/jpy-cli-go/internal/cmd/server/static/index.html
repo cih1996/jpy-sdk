@@ -40,8 +40,17 @@
             overflow-y: auto;
             padding: 10px 0;
         }
+        .category-header {
+            padding: 10px 15px 5px;
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: #888;
+            font-weight: 600;
+            margin-top: 10px;
+        }
         .command-item {
-            padding: 8px 15px;
+            padding: 6px 15px;
             cursor: pointer;
             font-size: 13px;
             display: flex;
@@ -169,29 +178,46 @@
             list.innerHTML = '';
             
             if (!commands || commands.length === 0) {
-                // Default commands if none provided
-                commands = [
-                    {name: "查看中间件设备", cmd: "jpy middleware device list"},
-                    {name: "查看中间件状态", cmd: "jpy middleware status"},
-                    {name: "生成 IP 配置", cmd: "jpy tools middleware create"},
-                    {name: "清屏", cmd: "clear"},
-                    {name: "退出", cmd: "exit"}
-                ];
+                // Default fallback if loading fails
+                commands = [{
+                    category: "默认",
+                    items: [
+                        {name: "查看中间件设备", cmd: "jpy middleware device list"},
+                        {name: "查看中间件状态", cmd: "jpy middleware status"},
+                        {name: "生成 IP 配置", cmd: "jpy tools middleware create"},
+                        {name: "清屏", cmd: "clear"},
+                        {name: "退出", cmd: "exit"}
+                    ]
+                }];
             }
 
-            commands.forEach(c => {
-                const div = document.createElement('div');
-                div.className = 'command-item';
-                div.innerHTML = `
-                    <div class="command-name">${c.name}</div>
-                    <div class="command-cmd" title="${c.cmd}">${c.cmd}</div>
-                `;
-                div.onclick = () => {
-                    // Send command + enter
-                    socket.send(JSON.stringify({type: 'input', data: c.cmd + '\r'}));
-                    term.focus();
-                };
-                list.appendChild(div);
+            // Check if it's legacy format (flat array) and convert to category format
+            if (commands.length > 0 && !commands[0].items) {
+                commands = [{ category: "常用命令", items: commands }];
+            }
+
+            commands.forEach(cat => {
+                // Render Category Header
+                const header = document.createElement('div');
+                header.className = 'category-header';
+                header.innerText = cat.category;
+                list.appendChild(header);
+
+                // Render Items
+                cat.items.forEach(c => {
+                    const div = document.createElement('div');
+                    div.className = 'command-item';
+                    div.innerHTML = `
+                        <div class="command-name">${c.name}</div>
+                        <div class="command-cmd" title="${c.cmd}">${c.cmd}</div>
+                    `;
+                    div.onclick = () => {
+                        // Send command + enter
+                        socket.send(JSON.stringify({type: 'input', data: c.cmd + '\r'}));
+                        term.focus();
+                    };
+                    list.appendChild(div);
+                });
             });
         }
         

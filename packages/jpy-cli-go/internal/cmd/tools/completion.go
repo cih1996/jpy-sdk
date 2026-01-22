@@ -140,7 +140,12 @@ source <(jpy completion bash)
 			}
 
 			fmt.Printf("成功! 自动补全脚本已添加到 %s\n", configFile)
-			fmt.Printf("请执行以下命令使其立即生效:\n\n  source %s\n\n", configFile)
+			if runtime.GOOS == "windows" {
+				fmt.Printf("注意: 如果遇到 '在此系统上禁止运行脚本' 的错误，请以管理员身份运行 PowerShell 并执行:\n\n  Set-ExecutionPolicy RemoteSigned -Scope CurrentUser\n\n")
+				fmt.Printf("然后执行以下命令使其生效:\n\n  . \"%s\"\n\n", configFile)
+			} else {
+				fmt.Printf("请执行以下命令使其立即生效:\n\n  source %s\n\n", configFile)
+			}
 		},
 	}
 	return cmd
