@@ -1,6 +1,6 @@
 {
   "name": "jpy",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "跨平台中间件 SDK - 支持 WebSocket 和 HTTP API 通信",
   "type": "module",
   "main": "./dist/index.cjs",

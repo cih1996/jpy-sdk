@@ -48,10 +48,14 @@ export class MirrorConnection {
       autoReconnect: config.autoReconnect !== undefined ? config.autoReconnect : true,
       reconnectInterval: config.reconnectInterval || 3000,
       maxReconnectAttempts: config.maxReconnectAttempts || 5,
+      fullUrl: config.fullUrl || '',
     };
   }
 
   private buildWSUrl(): string {
+    if (this.config.fullUrl) {
+      return this.config.fullUrl;
+    }
     let wsUrl = this.config.url.replace(/^https:\/\//, 'wss://').replace(/^http:\/\//, 'ws://');
     if (!wsUrl.startsWith('ws://') && !wsUrl.startsWith('wss://')) {
       wsUrl = 'wss://' + wsUrl;

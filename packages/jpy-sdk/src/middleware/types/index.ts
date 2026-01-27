@@ -197,6 +197,7 @@ export interface MirrorWSConfig {
     autoReconnect?: boolean;
     reconnectInterval?: number;
     maxReconnectAttempts?: number;
+    fullUrl?: string;
 }
 
 /**
