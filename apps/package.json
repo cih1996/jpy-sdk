@@ -8,8 +8,9 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "jpy": "workspace:*",
-    "vue": "^3.4.0"
+    "jpy": "github:cih1996/jpy-sdk#sdk",
+    "vue": "^3.4.0",
+    "vue-i18n": "^11.2.8"
   },
   "devDependencies": {
     "@types/node": "^25.0.8",

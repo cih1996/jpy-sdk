@@ -1,7 +1,14 @@
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n'
+
 defineProps<{
   title: string
 }>()
+
+const { locale } = useI18n()
+const toggleLanguage = () => {
+  locale.value = locale.value === 'zh' ? 'en' : 'zh'
+}
 </script>
 
 <template>
@@ -13,6 +20,10 @@ defineProps<{
     </div>
 
     <div class="header-actions">
+      <button @click="toggleLanguage" class="lang-btn">
+        {{ locale === 'zh' ? 'EN' : '中文' }}
+      </button>
+
       <div class="status-indicator">
         <div class="status-dot"></div>
         <span class="status-text">System Online</span>
@@ -26,6 +37,14 @@ defineProps<{
 </template>
 
 <style scoped>
+.lang-btn {
+  padding: 4px 8px;
+  border-radius: 4px;
+  border: 1px solid var(--border-color);
+  background: white;
+  cursor: pointer;
+  font-size: 0.875rem;
+}
 .header-breadcrumb {
   display: flex;
   align-items: center;
